@@ -47,15 +47,26 @@ class CUB200Dataset(Dataset):
         self.transform = transform
         self.use_attributes = use_attributes
         
-        self.data_dir = os.path.join(root, "CUB_200_2011")
+        # Handle both direct and nested folder structures
+        # Check for nested structure first: data/CUB_200_2011/CUB_200_2011/
+        nested_path = os.path.join(root, "CUB_200_2011", "CUB_200_2011")
+        direct_path = os.path.join(root, "CUB_200_2011")
+        
+        if os.path.exists(os.path.join(nested_path, "images")):
+            self.data_dir = nested_path
+        elif os.path.exists(os.path.join(direct_path, "images")):
+            self.data_dir = direct_path
+        else:
+            self.data_dir = direct_path  # Will fail with helpful message
         
         if download:
             self._download()
         
         if not self._check_exists():
             raise RuntimeError(
-                "Dataset not found. Set download=True or download manually from "
-                "https://www.vision.caltech.edu/datasets/cub_200_2011/"
+                f"Dataset not found at {self.data_dir}. "
+                "Download from https://www.vision.caltech.edu/datasets/cub_200_2011/ "
+                f"and extract to {root}/CUB_200_2011/"
             )
         
         self._load_data()

@@ -8,7 +8,10 @@ venv/
 env/
 .venv/
 
-# Data files
+# Data files (large datasets - do not commit)
+data/MNIST/
+data/CUB_200_2011/
+data/CLEVR*/
 data/mnist/
 data/cub200/
 data/clevr/

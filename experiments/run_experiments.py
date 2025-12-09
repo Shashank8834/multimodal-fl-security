@@ -119,6 +119,14 @@ class ExperimentRunner:
             train_data, test_data = load_cub200("./data")
             global_model = create_cub200_model(device=device)
             get_client_data_fn = get_cub200_client_data
+        elif config.dataset == "clevr":
+            from src.utils.clevr_loader import load_clevr, get_clevr_client_data
+            from src.models.cub200_cnn import create_cub200_model  # Reuse for now
+            train_data, test_data = load_clevr("./data")
+            # Use CUB-200 model but adjust classes
+            num_classes = getattr(train_data, 'num_classes', 28)
+            global_model = create_cub200_model(num_classes=num_classes, device=device)
+            get_client_data_fn = get_clevr_client_data
         else:
             raise ValueError(f"Unknown dataset: {config.dataset}")
         
