@@ -1,0 +1,100 @@
+# Experiment Configuration: Attack-Defense Study
+# Week 3: Comprehensive experiment configuration
+
+experiment:
+  name: "attack_defense_study"
+  description: "Systematic evaluation of attacks and defenses"
+  seed: 42
+  
+server:
+  address: "0.0.0.0:8080"
+  num_rounds: 10
+  min_clients: 3
+  fraction_fit: 1.0
+  fraction_evaluate: 1.0
+  
+client:
+  num_clients: 10
+  local_epochs: 1
+  batch_size: 32
+  learning_rate: 0.01
+  optimizer: "sgd"
+  momentum: 0.9
+
+data:
+  dataset: "mnist"
+  data_dir: "./data"
+  partition: "iid"  # iid, dirichlet, shard
+  dirichlet_alpha: 0.5  # for non-iid
+  num_shards: 2  # for shard partition
+  
+model:
+  name: "simple_cnn"
+  num_classes: 10
+  
+attack:
+  enabled: false
+  type: "none"  # none, label_flip, backdoor, model_replacement, adaptive_krum
+  malicious_client_ids: [0, 1]
+  
+  # Label flip config
+  label_flip:
+    source_class: 7
+    target_class: 1
+    poison_ratio: 0.3
+    
+  # Backdoor config  
+  backdoor:
+    trigger_size: 3
+    trigger_position: "bottom_right"
+    trigger_type: "square"
+    target_class: 0
+    poison_ratio: 0.1
+    
+  # Model replacement config
+  model_replacement:
+    scale_factor: 10.0
+    num_malicious: 2
+    
+  # Adaptive Krum config
+  adaptive_krum:
+    perturbation_scale: 0.05
+    num_malicious: 2
+
+defense:
+  enabled: false
+  type: "none"  # none, krum, multi_krum, trimmed_mean, median, fltrust, dp_sgd
+  
+  # Krum config
+  krum:
+    num_malicious: 2
+    multi_k: 1
+    
+  # Trimmed mean config
+  trimmed_mean:
+    trim_ratio: 0.1
+    
+  # FLTrust config
+  fltrust:
+    root_dataset_size: 100
+    learning_rate: 0.01
+    
+  # DP-SGD config
+  dp_sgd:
+    clip_norm: 1.0
+    noise_multiplier: 0.1
+    target_epsilon: 8.0
+    target_delta: 1e-5
+
+logging:
+  level: "INFO"
+  save_dir: "./experiments/logs"
+  tensorboard: true
+  save_checkpoints: true
+  checkpoint_interval: 5
+  
+evaluation:
+  test_every_round: true
+  save_results: true
+  results_dir: "./experiments/results"
+  compute_attack_success_rate: true
