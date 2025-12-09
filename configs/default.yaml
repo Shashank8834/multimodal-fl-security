@@ -1,0 +1,102 @@
+# Default Federated Learning Configuration
+# =========================================
+
+experiment:
+  name: "baseline_fedavg"
+  description: "Baseline FL training with FedAvg on MNIST"
+  seed: 42
+
+# Server Configuration
+server:
+  address: "0.0.0.0:8080"
+  num_rounds: 10
+  min_clients: 3
+  aggregation: "fedavg"  # Options: fedavg, krum, trimmed_mean, median, fltrust
+
+# Client Configuration
+client:
+  num_clients: 3
+  local_epochs: 1
+  batch_size: 32
+  learning_rate: 0.01
+  optimizer: "sgd"
+  momentum: 0.9
+
+# Data Configuration
+data:
+  dataset: "mnist"  # Options: mnist, cub200, clevr
+  data_dir: "./data"
+  partition: "iid"  # Options: iid, noniid, shard
+  # Non-IID specific settings
+  noniid:
+    alpha: 0.5  # Dirichlet concentration (lower = more heterogeneous)
+  # Shard specific settings
+  shard:
+    shards_per_client: 2
+
+# Model Configuration
+model:
+  type: "simple_cnn"  # Options: simple_cnn, resnet18, multimodal
+  num_classes: 10
+
+# Attack Configuration (disabled by default)
+attack:
+  enabled: false
+  type: "none"  # Options: none, label_flip, backdoor, model_replacement
+  malicious_clients: []  # List of malicious client IDs
+  
+  # Label Flip Attack
+  label_flip:
+    source_class: 0
+    target_class: 8
+    poison_ratio: 0.1  # Fraction of data to poison
+  
+  # Backdoor Attack
+  backdoor:
+    trigger_size: 3  # Size of trigger pattern (3x3 pixels)
+    trigger_position: "bottom_right"  # Options: bottom_right, top_left, center
+    target_class: 0
+    poison_ratio: 0.1
+
+  # Model Replacement Attack
+  model_replacement:
+    scale_factor: 10.0  # Scale factor for malicious updates
+
+# Defense Configuration (disabled by default)
+defense:
+  enabled: false
+  type: "none"  # Options: none, krum, multi_krum, trimmed_mean, median, fltrust, dp
+  
+  # Krum Defense
+  krum:
+    num_malicious: 1  # Assumed number of malicious clients
+    multi_k: 1  # Number of clients to select (1 = single Krum)
+  
+  # Trimmed Mean Defense
+  trimmed_mean:
+    trim_ratio: 0.1  # Fraction to trim from each end
+  
+  # FLTrust Defense
+  fltrust:
+    root_dataset_size: 100  # Size of clean root dataset on server
+  
+  # Differential Privacy Defense
+  differential_privacy:
+    clip_norm: 1.0  # Gradient clipping norm
+    noise_multiplier: 0.1  # Noise scale relative to clip_norm
+    target_epsilon: 8.0  # Target privacy budget
+
+# Logging and Checkpointing
+logging:
+  log_dir: "./experiments/logs"
+  checkpoint_dir: "./experiments/checkpoints"
+  save_every: 5  # Save checkpoint every N rounds
+  tensorboard: true
+
+# Evaluation
+evaluation:
+  evaluate_every: 1  # Evaluate every N rounds
+  metrics:
+    - accuracy
+    - loss
+    - attack_success_rate  # Only when attack is enabled
