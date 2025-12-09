@@ -1,0 +1,40 @@
+{
+  "config": {
+    "name": "none_none_mnist_iid_5c",
+    "dataset": "mnist",
+    "num_clients": 5,
+    "num_rounds": 5,
+    "local_epochs": 1,
+    "batch_size": 32,
+    "learning_rate": 0.01,
+    "partition": "iid",
+    "attack_enabled": false,
+    "attack_type": "none",
+    "malicious_clients": [],
+    "poison_ratio": 0.1,
+    "target_class": 0,
+    "defense_enabled": false,
+    "defense_type": "none",
+    "num_malicious_assumed": 1,
+    "trim_ratio": 0.1
+  },
+  "round_accuracies": [
+    0.9658,
+    0.9789,
+    0.9835,
+    0.9861,
+    0.9866
+  ],
+  "round_losses": [
+    0.16670336985588075,
+    0.06590861899922602,
+    0.048415566778404175,
+    0.040669047380948904,
+    0.03582846351260086
+  ],
+  "final_accuracy": 0.9866,
+  "final_loss": 0.03582846351260086,
+  "attack_success_rate": null,
+  "training_time_seconds": 148.86575961112976,
+  "timestamp": "2025-12-09T16:51:41.079815"
+}

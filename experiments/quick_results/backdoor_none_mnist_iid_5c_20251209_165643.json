@@ -1,0 +1,42 @@
+{
+  "config": {
+    "name": "backdoor_none_mnist_iid_5c",
+    "dataset": "mnist",
+    "num_clients": 5,
+    "num_rounds": 5,
+    "local_epochs": 1,
+    "batch_size": 32,
+    "learning_rate": 0.01,
+    "partition": "iid",
+    "attack_enabled": true,
+    "attack_type": "backdoor",
+    "malicious_clients": [
+      0
+    ],
+    "poison_ratio": 0.1,
+    "target_class": 0,
+    "defense_enabled": false,
+    "defense_type": "none",
+    "num_malicious_assumed": 1,
+    "trim_ratio": 0.1
+  },
+  "round_accuracies": [
+    0.9639,
+    0.9791,
+    0.9848,
+    0.9868,
+    0.9874
+  ],
+  "round_losses": [
+    0.15236649946272374,
+    0.06592867183899508,
+    0.04770628318518866,
+    0.041354355132556524,
+    0.037420014932070624
+  ],
+  "final_accuracy": 0.9874,
+  "final_loss": 0.037420014932070624,
+  "attack_success_rate": 0.09146341463414634,
+  "training_time_seconds": 152.13184356689453,
+  "timestamp": "2025-12-09T16:56:43.911268"
+}

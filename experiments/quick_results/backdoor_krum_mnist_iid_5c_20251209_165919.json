@@ -1,0 +1,42 @@
+{
+  "config": {
+    "name": "backdoor_krum_mnist_iid_5c",
+    "dataset": "mnist",
+    "num_clients": 5,
+    "num_rounds": 5,
+    "local_epochs": 1,
+    "batch_size": 32,
+    "learning_rate": 0.01,
+    "partition": "iid",
+    "attack_enabled": true,
+    "attack_type": "backdoor",
+    "malicious_clients": [
+      0
+    ],
+    "poison_ratio": 0.1,
+    "target_class": 0,
+    "defense_enabled": true,
+    "defense_type": "krum",
+    "num_malicious_assumed": 1,
+    "trim_ratio": 0.1
+  },
+  "round_accuracies": [
+    0.9684,
+    0.9782,
+    0.9841,
+    0.9846,
+    0.9868
+  ],
+  "round_losses": [
+    0.10944910266771912,
+    0.06333423653021455,
+    0.04951367919130716,
+    0.04497701116891112,
+    0.04104893546398089
+  ],
+  "final_accuracy": 0.9868,
+  "final_loss": 0.04104893546398089,
+  "attack_success_rate": 0.0015521064301552106,
+  "training_time_seconds": 155.14704775810242,
+  "timestamp": "2025-12-09T16:59:19.065863"
+}
