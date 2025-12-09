@@ -106,12 +106,21 @@ class ExperimentRunner:
         logger.info(f"Running experiment: {config.name}")
         start_time = time.time()
         
-        # Load data
-        train_data, test_data = load_mnist("./data")
-        
-        # Create model
+        # Load data based on dataset
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        global_model = create_model(device=device)
+        
+        if config.dataset == "mnist":
+            train_data, test_data = load_mnist("./data")
+            global_model = create_model(device=device)
+            get_client_data_fn = get_client_data
+        elif config.dataset == "cub200":
+            from src.utils.cub200_loader import load_cub200, get_cub200_client_data
+            from src.models.cub200_cnn import create_cub200_model
+            train_data, test_data = load_cub200("./data")
+            global_model = create_cub200_model(device=device)
+            get_client_data_fn = get_cub200_client_data
+        else:
+            raise ValueError(f"Unknown dataset: {config.dataset}")
         
         # Setup attack if enabled
         attack = None
@@ -139,7 +148,7 @@ class ExperimentRunner:
         # Create client data loaders
         client_loaders = []
         for client_id in range(config.num_clients):
-            client_data = get_client_data(
+            client_data = get_client_data_fn(
                 train_data, client_id, config.num_clients, config.partition
             )
             

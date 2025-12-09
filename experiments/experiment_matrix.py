@@ -33,7 +33,7 @@ class ExperimentMatrix:
     defenses: List[str] = field(default_factory=lambda: [
         'none', 'krum', 'trimmed_mean', 'median', 'dp_sgd'
     ])
-    datasets: List[str] = field(default_factory=lambda: ['mnist'])
+    datasets: List[str] = field(default_factory=lambda: ['mnist', 'cub200'])
     partitions: List[str] = field(default_factory=lambda: ['iid', 'dirichlet'])
     num_clients_list: List[int] = field(default_factory=lambda: [5, 10])
     malicious_ratios: List[float] = field(default_factory=lambda: [0.2])
@@ -200,12 +200,16 @@ class BatchExperimentRunner:
 
 
 def run_full_matrix():
-    """Run the complete experiment matrix."""
+    """Run the complete experiment matrix (all combinations for research)."""
     matrix = ExperimentMatrix()
-    logger.info(f"Total experiments in matrix: {matrix.get_total_experiments()}")
+    total = matrix.get_total_experiments()
+    configs = matrix.generate_configs()
     
-    runner = BatchExperimentRunner()
-    results = runner.run_matrix(matrix, max_experiments=20)  # Limit for now
+    logger.info(f"Full matrix: {total} combinations, {len(configs)} after filtering")
+    logger.info(f"Estimated time: ~{len(configs) * 2.5:.0f} minutes (~{len(configs) * 2.5 / 60:.1f} hours)")
+    
+    runner = BatchExperimentRunner("./experiments/full_results")
+    results = runner.run_matrix(matrix, max_experiments=None)  # No limit - run all
     
     return results
 
