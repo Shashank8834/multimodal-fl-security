@@ -2,7 +2,7 @@
 CUB-200 Classification Model
 
 CNN model for CUB-200 bird classification (200 classes).
-Uses ResNet-18 backbone pretrained on ImageNet.
+Uses ResNet-50 backbone pretrained on ImageNet.
 """
 
 import torch
@@ -16,53 +16,33 @@ class CUB200CNN(nn.Module):
     """
     CNN for CUB-200 classification.
     
-    Uses a smaller custom CNN (not pretrained) for faster FL training.
-    For research, this is sufficient to demonstrate attack/defense effectiveness.
+    Uses pretrained ResNet-50 backbone for transfer learning.
+    All layers trainable by default for FL (better convergence).
     """
     
-    def __init__(self, num_classes: int = 200):
+    def __init__(self, num_classes: int = 200, pretrained: bool = True, freeze_backbone: bool = False):
         super().__init__()
         
-        # Convolutional layers (for 224x224 input)
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm2d(128)
-        self.conv4 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
-        self.bn4 = nn.BatchNorm2d(256)
+        # Load pretrained ResNet-50 (much better for fine-grained classification)
+        from torchvision import models
+        weights = models.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None
+        self.resnet = models.resnet50(weights=weights)
         
-        self.pool = nn.MaxPool2d(2, 2)
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
+        # Optionally freeze backbone (not recommended for FL)
+        if freeze_backbone and pretrained:
+            for name, param in self.resnet.named_parameters():
+                if 'fc' not in name:  # Keep fc layer trainable
+                    param.requires_grad = False
         
-        # Fully connected layers
-        self.fc1 = nn.Linear(256 * 4 * 4, 512)
-        self.fc2 = nn.Linear(512, num_classes)
-        
-        self.dropout = nn.Dropout(0.5)
+        # Replace final FC layer with simpler classifier
+        in_features = self.resnet.fc.in_features  # 2048 for ResNet-50
+        self.resnet.fc = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(in_features, num_classes)
+        )
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Conv block 1
-        x = self.pool(F.relu(self.bn1(self.conv1(x))))  # 224 -> 112
-        # Conv block 2
-        x = self.pool(F.relu(self.bn2(self.conv2(x))))  # 112 -> 56
-        # Conv block 3
-        x = self.pool(F.relu(self.bn3(self.conv3(x))))  # 56 -> 28
-        # Conv block 4
-        x = self.pool(F.relu(self.bn4(self.conv4(x))))  # 28 -> 14
-        
-        # Adaptive pooling
-        x = self.adaptive_pool(x)  # 14 -> 4
-        
-        # Flatten
-        x = x.view(x.size(0), -1)
-        
-        # FC layers
-        x = self.dropout(F.relu(self.fc1(x)))
-        x = self.fc2(x)
-        
-        return x
+        return self.resnet(x)
     
     def get_weights(self) -> List[np.ndarray]:
         """Get model weights as numpy arrays."""

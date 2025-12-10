@@ -21,7 +21,7 @@ multimodal-fl-security/
 │   ├── defenses/        # Defense mechanisms
 │   ├── models/          # Neural network models
 │   └── utils/           # Utilities (data loading, metrics, etc.)
-├── data/                # Datasets (MNIST, CUB-200, CLEVR)
+├── data/                # Datasets (MNIST, CUB-200)
 ├── configs/             # Experiment configurations
 ├── experiments/         # Logs and results
 ├── docs/                # Documentation
@@ -100,8 +100,7 @@ python run_experiment.py --config configs/default.yaml
 
 ### Datasets
 - [x] MNIST (baseline testing)
-- [ ] CUB-200-2011 (bird species - image + attributes)
-- [ ] CLEVR (visual reasoning - image + text)
+- [x] CUB-200-2011 (fine-grained bird classification)
 
 ## Configuration
 

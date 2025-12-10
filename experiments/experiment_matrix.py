@@ -26,15 +26,17 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ExperimentMatrix:
-    """Defines the full experiment matrix."""
+    """Defines the full experiment matrix for all datasets."""
     attacks: List[str] = field(default_factory=lambda: [
         'none', 'label_flip', 'backdoor', 'model_replacement'
     ])
     defenses: List[str] = field(default_factory=lambda: [
         'none', 'krum', 'trimmed_mean', 'median', 'dp_sgd'
     ])
+    # MNIST + CUB-200 (image classification tasks)
+    # CLEVR excluded - requires VQA (Visual Question Answering) model
     datasets: List[str] = field(default_factory=lambda: ['mnist', 'cub200'])
-    partitions: List[str] = field(default_factory=lambda: ['iid', 'dirichlet'])
+    partitions: List[str] = field(default_factory=lambda: ['iid', 'noniid'])
     num_clients_list: List[int] = field(default_factory=lambda: [5, 10])
     malicious_ratios: List[float] = field(default_factory=lambda: [0.2])
     
@@ -48,19 +50,25 @@ class ExperimentMatrix:
         """Generate all experiment configurations."""
         configs = []
         
+        # Dataset-specific hyperparameters optimized for research
+        # CUB-200: More training for higher accuracy on fine-grained classification
+        dataset_params = {
+            'mnist': {'num_rounds': 10, 'local_epochs': 2, 'learning_rate': 0.01, 'batch_size': 64},
+            'cub200': {'num_rounds': 100, 'local_epochs': 3, 'learning_rate': 0.001, 'batch_size': 32},
+        }
+        
         for attack, defense, dataset, partition, num_clients, mal_ratio in itertools.product(
             self.attacks, self.defenses, self.datasets, 
             self.partitions, self.num_clients_list, self.malicious_ratios
         ):
-            # Skip invalid combinations
-            if attack == 'none' and defense != 'none':
-                # Defense-only experiments less interesting but include some
-                if defense not in ['none', 'krum']:
-                    continue
+            # All combinations are now included (no filtering)
             
             # Calculate malicious clients
             num_malicious = max(1, int(num_clients * mal_ratio))
             malicious_clients = list(range(num_malicious))
+            
+            # Get dataset-specific params
+            params = dataset_params.get(dataset, dataset_params['mnist'])
             
             name = f"{attack}_{defense}_{dataset}_{partition}_{num_clients}c"
             
@@ -68,10 +76,10 @@ class ExperimentMatrix:
                 name=name,
                 dataset=dataset,
                 num_clients=num_clients,
-                num_rounds=5,  # Quick experiments
-                local_epochs=1,
-                batch_size=32,
-                learning_rate=0.01,
+                num_rounds=params['num_rounds'],
+                local_epochs=params['local_epochs'],
+                batch_size=params['batch_size'],
+                learning_rate=params['learning_rate'],
                 partition=partition,
                 attack_enabled=(attack != 'none'),
                 attack_type=attack if attack != 'none' else 'none',

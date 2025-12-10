@@ -2,7 +2,7 @@
 Data Loading Utilities
 
 Provides functions for loading datasets and distributing data to FL clients.
-Supports MNIST for baseline testing and will support CUB-200 and CLEVR.
+Supports MNIST for baseline testing and CUB-200 for fine-grained classification.
 """
 
 import torch

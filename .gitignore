@@ -8,18 +8,29 @@ venv/
 env/
 .venv/
 
-# Data files (large datasets - do not commit)
-data/MNIST/
-data/CUB_200_2011/
-data/CLEVR*/
-data/mnist/
-data/cub200/
-data/clevr/
+# Data files (large datasets - download separately)
+data/
+!data/.gitkeep
 
-# Experiment outputs
-experiments/logs/
+# Experiment outputs (generated during training)
 experiments/results/
+experiments/full_results/
+experiments/quick_results/
+experiments/logs/
 experiments/checkpoints/
+*.json
+*.pt
+*.pth
+
+# Visualization outputs
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+# Log files
+*.log
+experiment_log_*.log
 
 # IDE
 .vscode/
@@ -39,5 +50,10 @@ dist/
 build/
 *.egg-info/
 
+# PyTorch cache
+.cache/
+
 # Keep placeholder files
 !.gitkeep
+!requirements.txt
+!README.md

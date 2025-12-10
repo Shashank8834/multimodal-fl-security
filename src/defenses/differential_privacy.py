@@ -42,8 +42,10 @@ class DPSGDDefense(BaseDefense):
     def __init__(self, defense_config: Dict[str, Any]):
         super().__init__(defense_config)
         
-        self.clip_norm = defense_config.get('clip_norm', 1.0)
-        self.noise_multiplier = defense_config.get('noise_multiplier', 0.1)
+        # Adaptive clipping will adjust this based on actual gradient norms
+        self.clip_norm = defense_config.get('clip_norm', 10.0)
+        # Reduced noise for better accuracy (trade-off with privacy)
+        self.noise_multiplier = defense_config.get('noise_multiplier', 0.005)
         self.target_epsilon = defense_config.get('target_epsilon', 8.0)
         self.target_delta = defense_config.get('target_delta', 1e-5)
         
@@ -152,7 +154,7 @@ class DPSGDDefense(BaseDefense):
             )
             aggregated.append(weighted_sum / total_examples)
         
-        # Step 3: Add noise
+        # Step 3: Add noise (reduced noise_multiplier for better accuracy)
         noisy = self.add_noise(aggregated, n)
         
         # Update privacy accounting

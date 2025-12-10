@@ -108,6 +108,11 @@ class ExperimentRunner:
         
         # Load data based on dataset
         device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Using device: {device.upper()}" + (f" ({torch.cuda.get_device_name(0)})" if device == "cuda" else ""))
+        
+        # Enable mixed precision training for faster GPU computation
+        use_amp = device == "cuda"
+        scaler = torch.amp.GradScaler() if use_amp else None
         
         if config.dataset == "mnist":
             train_data, test_data = load_mnist("./data")
@@ -119,14 +124,6 @@ class ExperimentRunner:
             train_data, test_data = load_cub200("./data")
             global_model = create_cub200_model(device=device)
             get_client_data_fn = get_cub200_client_data
-        elif config.dataset == "clevr":
-            from src.utils.clevr_loader import load_clevr, get_clevr_client_data
-            from src.models.cub200_cnn import create_cub200_model  # Reuse for now
-            train_data, test_data = load_clevr("./data")
-            # Use CUB-200 model but adjust classes
-            num_classes = getattr(train_data, 'num_classes', 28)
-            global_model = create_cub200_model(num_classes=num_classes, device=device)
-            get_client_data_fn = get_clevr_client_data
         else:
             raise ValueError(f"Unknown dataset: {config.dataset}")
         
@@ -182,26 +179,48 @@ class ExperimentRunner:
             num_examples = []
             
             for client_id, loader in enumerate(client_loaders):
-                # Clone global model for local training
-                local_model = create_model(device=device)
+                # Clone global model for local training - use same architecture as global model
+                if config.dataset == "mnist":
+                    local_model = create_model(device=device)
+                elif config.dataset == "cub200":
+                    from src.models.cub200_cnn import create_cub200_model
+                    local_model = create_cub200_model(device=device)
+
+                else:
+                    local_model = create_model(device=device)
                 local_model.load_state_dict(global_model.state_dict())
                 
+                # SGD with momentum works better for FL (Adam momentum doesn't transfer in aggregation)
                 optimizer = torch.optim.SGD(
                     local_model.parameters(),
                     lr=config.learning_rate,
-                    momentum=0.9
+                    momentum=0.9,
+                    weight_decay=1e-4 if config.dataset == "cub200" else 0
                 )
                 
-                # Local training
+                # Local training with mixed precision
                 local_model.train()
                 for _ in range(config.local_epochs):
                     for images, labels in loader:
                         images, labels = images.to(device), labels.to(device)
                         optimizer.zero_grad()
-                        outputs = local_model(images)
-                        loss = criterion(outputs, labels)
-                        loss.backward()
-                        optimizer.step()
+                        
+                        # Use automatic mixed precision for faster training
+                        if use_amp:
+                            with torch.amp.autocast(device_type='cuda', dtype=torch.float16):
+                                outputs = local_model(images)
+                                loss = criterion(outputs, labels)
+                            scaler.scale(loss).backward()
+                            scaler.unscale_(optimizer)
+                            torch.nn.utils.clip_grad_norm_(local_model.parameters(), max_norm=1.0)
+                            scaler.step(optimizer)
+                            scaler.update()
+                        else:
+                            outputs = local_model(images)
+                            loss = criterion(outputs, labels)
+                            loss.backward()
+                            torch.nn.utils.clip_grad_norm_(local_model.parameters(), max_norm=1.0)
+                            optimizer.step()
                 
                 # Get update
                 update = [p.data.clone() for p in local_model.parameters()]
@@ -233,6 +252,19 @@ class ExperimentRunner:
             round_losses.append(metrics['loss'])
             
             logger.info(f"Round {round_num}: Accuracy={metrics['accuracy']:.4f}, Loss={metrics['loss']:.4f}")
+            
+            # Save checkpoint every 10 rounds for long-running experiments
+            if round_num % 10 == 0:
+                checkpoint_path = os.path.join(
+                    self.results_dir,
+                    f"{config.name}_checkpoint_round{round_num}.pt"
+                )
+                torch.save({
+                    'round': round_num,
+                    'model_state_dict': global_model.state_dict(),
+                    'accuracy': metrics['accuracy'],
+                    'loss': metrics['loss']
+                }, checkpoint_path)
         
         # Compute attack success rate if applicable
         asr = None

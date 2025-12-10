@@ -194,8 +194,10 @@ def get_cub200_transforms(train: bool = True):
     if train:
         return transforms.Compose([
             transforms.Resize(256),
-            transforms.RandomCrop(224),
+            transforms.RandomResizedCrop(224, scale=(0.7, 1.0)),
             transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(15),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406],
@@ -282,7 +284,7 @@ def get_cub200_client_data(
         
         client_indices = indices[start:end]
     
-    elif partition == "dirichlet":
+    elif partition == "noniid":
         # Non-IID split using Dirichlet distribution
         np.random.seed(42)
         

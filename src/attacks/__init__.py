@@ -9,6 +9,7 @@ from .model_poisoning import (
     ScalingAttack,
     InnerProductManipulationAttack
 )
+from .cross_modal import CrossModalBackdoorAttack, ModalityAwareBackdoorAttack
 
 __all__ = [
     # Base
@@ -24,6 +25,9 @@ __all__ = [
     'AdaptiveKrumAttack',
     'ScalingAttack',
     'InnerProductManipulationAttack',
+    # Multimodal
+    'CrossModalBackdoorAttack',
+    'ModalityAwareBackdoorAttack',
 ]
 
 
@@ -50,9 +54,13 @@ def get_attack(attack_type: str, attack_config: dict):
         'adaptive_krum': AdaptiveKrumAttack,
         'scaling': ScalingAttack,
         'ipm': InnerProductManipulationAttack,
+        # Multimodal
+        'cross_modal': CrossModalBackdoorAttack,
+        'modality_aware': ModalityAwareBackdoorAttack,
     }
     
     if attack_type not in attacks:
         raise ValueError(f"Unknown attack type: {attack_type}. Available: {list(attacks.keys())}")
     
     return attacks[attack_type](attack_config)
+

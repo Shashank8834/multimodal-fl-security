@@ -1,2 +1,4 @@
-# Data Directory
-# Place datasets here (MNIST will be auto-downloaded)
+# Data directory placeholder
+# Download datasets separately:
+# - MNIST: Auto-downloaded by torchvision
+# - CUB-200: https://www.vision.caltech.edu/datasets/cub_200_2011/
