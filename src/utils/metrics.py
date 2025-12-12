@@ -98,6 +98,255 @@ def compute_attack_success_rate(
     return success / total if total > 0 else 0.0
 
 
+def compute_label_flip_asr(
+    model: nn.Module,
+    data_loader: DataLoader,
+    source_class: int,
+    target_class: int,
+    device: str = "cpu"
+) -> Dict[str, float]:
+    """
+    Compute ASR for label flip attacks.
+    
+    For label flip attacks, ASR measures:
+    1. What % of source_class samples are misclassified as target_class
+    2. How much the source_class accuracy dropped
+    
+    Args:
+        model: The model to evaluate
+        data_loader: Clean test data loader
+        source_class: The class being flipped from
+        target_class: The class being flipped to
+        device: Device for computation
+        
+    Returns:
+        Dictionary with ASR metrics
+    """
+    model.eval()
+    model.to(device)
+    
+    source_total = 0
+    source_correct = 0
+    source_to_target = 0  # Misclassified as target
+    
+    with torch.no_grad():
+        for images, labels in data_loader:
+            images, labels = images.to(device), labels.to(device)
+            
+            outputs = model(images)
+            _, predicted = torch.max(outputs.data, 1)
+            
+            # Focus on source class samples
+            source_mask = labels == source_class
+            source_preds = predicted[source_mask]
+            source_labels = labels[source_mask]
+            
+            source_total += source_mask.sum().item()
+            source_correct += (source_preds == source_labels).sum().item()
+            source_to_target += (source_preds == target_class).sum().item()
+    
+    source_accuracy = source_correct / source_total if source_total > 0 else 0.0
+    flip_rate = source_to_target / source_total if source_total > 0 else 0.0
+    
+    return {
+        "source_accuracy": source_accuracy,
+        "flip_rate": flip_rate,  # This is the ASR for label flip
+        "source_total": source_total,
+        "source_correct": source_correct,
+        "misclassified_as_target": source_to_target
+    }
+
+
+def compute_model_poisoning_metrics(
+    poisoned_model: nn.Module,
+    clean_model: nn.Module,
+    data_loader: DataLoader,
+    device: str = "cpu"
+) -> Dict[str, float]:
+    """
+    Compute metrics for model poisoning attacks.
+    
+    Measures:
+    1. Accuracy drop compared to clean model
+    2. Parameter divergence from clean model
+    3. Prediction disagreement rate
+    
+    Args:
+        poisoned_model: Model trained with poisoning attack
+        clean_model: Model trained without attack (baseline)
+        data_loader: Test data loader
+        device: Device for computation
+        
+    Returns:
+        Dictionary with model poisoning metrics
+    """
+    poisoned_model.eval()
+    clean_model.eval()
+    poisoned_model.to(device)
+    clean_model.to(device)
+    
+    # Compute accuracy for both models
+    poisoned_correct = 0
+    clean_correct = 0
+    disagreements = 0
+    total = 0
+    
+    with torch.no_grad():
+        for images, labels in data_loader:
+            images, labels = images.to(device), labels.to(device)
+            
+            poisoned_out = poisoned_model(images)
+            clean_out = clean_model(images)
+            
+            _, poisoned_pred = torch.max(poisoned_out.data, 1)
+            _, clean_pred = torch.max(clean_out.data, 1)
+            
+            total += labels.size(0)
+            poisoned_correct += (poisoned_pred == labels).sum().item()
+            clean_correct += (clean_pred == labels).sum().item()
+            disagreements += (poisoned_pred != clean_pred).sum().item()
+    
+    poisoned_acc = poisoned_correct / total if total > 0 else 0.0
+    clean_acc = clean_correct / total if total > 0 else 0.0
+    disagreement_rate = disagreements / total if total > 0 else 0.0
+    
+    # Compute parameter divergence
+    param_divergence = compute_param_divergence(poisoned_model, clean_model)
+    
+    return {
+        "poisoned_accuracy": poisoned_acc,
+        "clean_accuracy": clean_acc,
+        "accuracy_drop": clean_acc - poisoned_acc,
+        "disagreement_rate": disagreement_rate,
+        "param_divergence": param_divergence
+    }
+
+
+def compute_param_divergence(
+    model1: nn.Module,
+    model2: nn.Module
+) -> float:
+    """
+    Compute L2 distance between model parameters.
+    
+    Args:
+        model1: First model
+        model2: Second model
+        
+    Returns:
+        L2 distance between parameters
+    """
+    total_diff = 0.0
+    for p1, p2 in zip(model1.parameters(), model2.parameters()):
+        total_diff += torch.norm(p1.data - p2.data).item() ** 2
+    return total_diff ** 0.5
+
+
+class AttackMetricsTracker:
+    """
+    Unified tracker for attack success metrics.
+    
+    Provides consistent interface for measuring attack effectiveness
+    across different attack types.
+    
+    Usage:
+        tracker = AttackMetricsTracker(attack_type="backdoor", target_class=0)
+        metrics = tracker.compute(model, test_loader, triggered_loader, device)
+    """
+    
+    def __init__(
+        self,
+        attack_type: str,
+        source_class: int = None,
+        target_class: int = None
+    ):
+        self.attack_type = attack_type
+        self.source_class = source_class
+        self.target_class = target_class
+        self.metrics_history = []
+    
+    def compute(
+        self,
+        model: nn.Module,
+        clean_loader: DataLoader,
+        poisoned_loader: DataLoader = None,
+        device: str = "cpu",
+        clean_model: nn.Module = None
+    ) -> Dict[str, float]:
+        """
+        Compute attack-specific metrics.
+        
+        Args:
+            model: Model to evaluate
+            clean_loader: Clean test data
+            poisoned_loader: Triggered/poisoned test data (for backdoor)
+            device: Computation device
+            clean_model: Baseline model (for model poisoning comparison)
+            
+        Returns:
+            Dictionary with attack metrics
+        """
+        # Always compute main task accuracy
+        main_metrics = evaluate_model(model, clean_loader, device)
+        
+        result = {
+            "main_accuracy": main_metrics["accuracy"],
+            "main_loss": main_metrics["loss"]
+        }
+        
+        if self.attack_type == "backdoor" and poisoned_loader is not None:
+            asr = compute_attack_success_rate(
+                model, poisoned_loader, self.target_class, device
+            )
+            result["asr"] = asr
+            result["attack_type"] = "backdoor"
+            
+        elif self.attack_type == "label_flip":
+            flip_metrics = compute_label_flip_asr(
+                model, clean_loader, self.source_class, self.target_class, device
+            )
+            result.update(flip_metrics)
+            result["asr"] = flip_metrics["flip_rate"]
+            result["attack_type"] = "label_flip"
+            
+        elif self.attack_type in ["model_replacement", "model_poisoning", "scaling"]:
+            if clean_model is not None:
+                poison_metrics = compute_model_poisoning_metrics(
+                    model, clean_model, clean_loader, device
+                )
+                result.update(poison_metrics)
+                result["asr"] = poison_metrics["accuracy_drop"]
+                result["attack_type"] = "model_poisoning"
+            else:
+                result["asr"] = None
+                result["attack_type"] = "model_poisoning"
+        else:
+            result["asr"] = None
+            result["attack_type"] = self.attack_type
+        
+        self.metrics_history.append(result)
+        return result
+    
+    def get_history(self) -> list:
+        """Get all computed metrics."""
+        return self.metrics_history
+    
+    def get_summary(self) -> Dict[str, float]:
+        """Get summary statistics from all rounds."""
+        if not self.metrics_history:
+            return {}
+        
+        asrs = [m.get("asr") for m in self.metrics_history if m.get("asr") is not None]
+        accs = [m.get("main_accuracy") for m in self.metrics_history]
+        
+        return {
+            "final_asr": asrs[-1] if asrs else None,
+            "avg_asr": np.mean(asrs) if asrs else None,
+            "final_accuracy": accs[-1] if accs else None,
+            "avg_accuracy": np.mean(accs) if accs else None
+        }
+
+
 def compute_class_accuracy(
     model: nn.Module,
     data_loader: DataLoader,

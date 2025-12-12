@@ -40,6 +40,7 @@ class ExperimentConfig:
     batch_size: int = 32
     learning_rate: float = 0.01
     partition: str = "iid"
+    seed: int = 42  # Random seed for reproducibility
     
     # Attack configuration
     attack_enabled: bool = False
@@ -101,9 +102,20 @@ class ExperimentRunner:
         This is faster for testing and produces the same results.
         """
         import torch
+        import random
         from torch.utils.data import DataLoader
         
-        logger.info(f"Running experiment: {config.name}")
+        # Set random seeds for reproducibility
+        seed = config.seed
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+        
+        logger.info(f"Running experiment: {config.name} (seed={seed})")
         start_time = time.time()
         
         # Load data based on dataset
@@ -380,6 +392,113 @@ def run_defense_experiments():
         trim_ratio=0.2
     )
     runner.run_simulation(config)
+
+
+@dataclass
+class MultiSeedResults:
+    """Results from running an experiment with multiple seeds."""
+    config_name: str
+    seeds: List[int]
+    accuracies: List[float]
+    losses: List[float]
+    mean_accuracy: float
+    std_accuracy: float
+    ci_95_accuracy: float  # 95% confidence interval half-width
+    mean_loss: float
+    std_loss: float
+    
+    def to_dict(self) -> Dict:
+        return asdict(self)
+    
+    def save(self, filepath: str):
+        with open(filepath, 'w') as f:
+            json.dump(self.to_dict(), f, indent=2)
+    
+    def __repr__(self) -> str:
+        return (f"MultiSeedResults({self.config_name}: "
+                f"acc={self.mean_accuracy:.4f}±{self.std_accuracy:.4f})")
+
+
+def run_multi_seed(
+    config: ExperimentConfig,
+    seeds: List[int] = None,
+    results_dir: str = "./experiments/results"
+) -> MultiSeedResults:
+    """
+    Run an experiment with multiple seeds for statistical significance.
+    
+    Args:
+        config: Base experiment configuration
+        seeds: List of random seeds (default: [42, 123, 456, 789, 1024])
+        results_dir: Directory to save results
+        
+    Returns:
+        MultiSeedResults with mean, std, and confidence intervals
+    """
+    if seeds is None:
+        seeds = [42, 123, 456, 789, 1024]
+    
+    runner = ExperimentRunner(results_dir)
+    accuracies = []
+    losses = []
+    
+    logger.info(f"Running {config.name} with {len(seeds)} seeds: {seeds}")
+    
+    for seed in seeds:
+        # Create a copy of config with new seed
+        seed_config = ExperimentConfig(
+            name=f"{config.name}_seed{seed}",
+            dataset=config.dataset,
+            num_clients=config.num_clients,
+            num_rounds=config.num_rounds,
+            local_epochs=config.local_epochs,
+            batch_size=config.batch_size,
+            learning_rate=config.learning_rate,
+            partition=config.partition,
+            seed=seed,
+            attack_enabled=config.attack_enabled,
+            attack_type=config.attack_type,
+            malicious_clients=config.malicious_clients,
+            poison_ratio=config.poison_ratio,
+            target_class=config.target_class,
+            defense_enabled=config.defense_enabled,
+            defense_type=config.defense_type,
+            num_malicious_assumed=config.num_malicious_assumed,
+            trim_ratio=config.trim_ratio
+        )
+        
+        result = runner.run_simulation(seed_config)
+        accuracies.append(result.final_accuracy)
+        losses.append(result.final_loss)
+    
+    # Compute statistics
+    mean_acc = np.mean(accuracies)
+    std_acc = np.std(accuracies, ddof=1)  # Sample std
+    ci_95 = 1.96 * std_acc / np.sqrt(len(seeds))
+    
+    multi_results = MultiSeedResults(
+        config_name=config.name,
+        seeds=seeds,
+        accuracies=accuracies,
+        losses=losses,
+        mean_accuracy=mean_acc,
+        std_accuracy=std_acc,
+        ci_95_accuracy=ci_95,
+        mean_loss=np.mean(losses),
+        std_loss=np.std(losses, ddof=1)
+    )
+    
+    # Save aggregated results
+    results_file = os.path.join(
+        results_dir,
+        f"{config.name}_multi_seed_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
+    multi_results.save(results_file)
+    
+    logger.info(f"Multi-seed results: {multi_results}")
+    logger.info(f"Saved to {results_file}")
+    
+    return multi_results
 
 
 if __name__ == "__main__":

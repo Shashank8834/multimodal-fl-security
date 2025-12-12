@@ -56,4 +56,8 @@ build/
 # Keep placeholder files
 !.gitkeep
 !requirements.txt
-!README.md
+
+# Exclude from tracking (Paper 2 / Draft files)
+future_paper2_crossmodal/
+PROCEDURE_GUIDE.md
+README.md
